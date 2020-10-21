@@ -54,6 +54,20 @@ object Main {
     def reset(): Combinator[A] = Atom(None, predicate, output)
   }
 
+  case class Or[A](value: Option[A], child1: Combinator[A], child2: Combinator[A]) extends Combinator[A] {
+    def this(child1: Combinator[A], child2: Combinator[A]) = this(None, child1, child2)
+
+    def next(a: A): Combinator[A] = child1
+      .next(a) map (newChild1 => child2
+      .next(a) map (newChild2 =>
+        Or(newChild1.get() orElse newChild2.get(), newChild1, newChild2)
+      ))
+
+    def get(): Option[A] = value
+
+    def reset(): Combinator[A] = Or(None, child1.reset(), child2.reset())
+  }
+
   case class Iter[A](value: Option[A], aggValue: A, init: A, transform: (A, A) => A, output: A => A, child: Combinator[A]) extends Combinator[A] {
     def this(init: A, transform: (A, A) => A, output: A => A, child: Combinator[A]) = this(None, init, init, transform, output, child)
 
@@ -146,14 +160,26 @@ object Main {
      * 1 2 3 4 5 -1 4 5 6 -2
      */
 
+    // ((>0)* (<=0))*
     val atomP = new Atom[Int](x => x > 0, x => x);
     val iterP = new Iter[Int](0, (a, b) => a + b, a => a, atomP);
     val atomN = new Atom[Int](x => x <= 0, x => x);
     val split = new Split[Int](iterP, atomN, (x, y) => x + y);
     val iterSplit = new Iter[Int](1, (a, b) => a * b, a => a, split);
 
+    // ((<=0)* (>0))*
+    val atom2N = new Atom[Int](x => x <= 0, x => x);
+    val iter2N = new Iter[Int](0, (a, b) => a + b, a => a, atom2N);
+    val atom2P = new Atom[Int](x => x > 0, x => x);
+    val split2 = new Split[Int](iter2N, atom2P, (x, y) => x + y);
+    val iterSplit2 = new Iter[Int](1, (a, b) => a * b, a => a, split2);
 
-//    print(split.next(5).next(5).next(-6).get())
-    print(iterSplit.next(-2).next(10).next(2).next(-8).next(5).next(5).next(-6).get())
+    // ((>0)* (<=0))* || ((<=0)* (>0))*
+    var or = new Or[Int](iterSplit, iterSplit2);
+
+    List(-2, 10, 2, -8, 5, 5, -6)
+      .map(or.next)
+      .map(_.get())
+      .foreach(println)
   }
 }
