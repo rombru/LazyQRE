@@ -1,3 +1,5 @@
+package be.bruyere.romain
+
 //class IterC(
 //          init: Int,
 //          transform : (Int, Int) => Int,
@@ -54,6 +56,17 @@ object Main {
     def reset(): Combinator[A] = Atom(None, predicate, output)
   }
 
+  case class Apply[A](value: Option[A], child: Combinator[A], transform: A => A) extends Combinator[A] {
+    def this(child: Combinator[A], transform: A => A) = this(None, child, transform)
+
+    def next(a: A): Combinator[A] = child
+      .next(a) map (newChild => Apply(newChild.get().map(transform), newChild, transform))
+
+    def get(): Option[A] = value
+
+    def reset(): Combinator[A] = Apply(None, child.reset(), transform)
+  }
+
   case class Or[A](value: Option[A], child1: Combinator[A], child2: Combinator[A]) extends Combinator[A] {
     def this(child1: Combinator[A], child2: Combinator[A]) = this(None, child1, child2)
 
@@ -99,7 +112,7 @@ object Main {
       childNb match {
         case 1 => child1.next(a) map (newChild => nextByChild(child1, newChild, a, createSplitWithChilds(newChild, child2)))
         case 2 => child2.next(a) map (newChild => nextByChild(child2, newChild, a, createSplitWithChilds(child1, newChild)))
-        case other => this.reset().next(a)
+        case _ => this.reset().next(a)
       }
     }
 
@@ -108,7 +121,7 @@ object Main {
         case Some(output) => onMatch(newChild, output) map { (value, aggValue, childNb, child) => factory(value, aggValue, childNb, transform) }
         case None => newChild match {
           case Iter(_, _, _, _, _, _) => onIterMiss(prevChild, newChild) map { (value, aggValue, childNb, child) => factory(value, aggValue, childNb, transform).next(a) }
-          case other => this.reset() // Undefined ?
+          case _ => this.reset() // Undefined ?
         }
       }
     }
@@ -126,6 +139,7 @@ object Main {
                 .map(v => (None, Some(v), childNb + 1, newChild))
                 .getOrElse((None, Some(init), childNb + 1, newChild))
             )
+        case _ => (None, None, 1, newChild) // Never happen
       }
     }
 
@@ -134,7 +148,7 @@ object Main {
         case Iter(_, _, _, _, _, _) => prevValue
           .map(p => (Some(transform(p, output)), prevValue, childNb, child))
           .getOrElse((None, None, childNb, child))
-        case other => prevValue
+        case _ => prevValue
           .map(p => (Some(transform(p, output)), Some(output), childNb + 1, child))
           .getOrElse((None, Some(output), childNb + 1, child))
       }
