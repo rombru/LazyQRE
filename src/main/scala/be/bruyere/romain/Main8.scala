@@ -20,10 +20,11 @@ object Main8 {
     // iter addition
     val i = 3;
     def iterTransform = (x: Int, y: Int) => x + y
+
     val currentIter1 = (x: Int) => {
       currentSplitSub(iterTransform(3, x), _)
     }
-    val resultIter1 = (x: Int) => currentSplitSub(3,x);
+    val resultIter1 = (x: Int) => currentSplitSub(3, x);
 
     //split division
     def splitDivide = (x: Int, y: Int) => {
@@ -33,7 +34,7 @@ object Main8 {
 
     //atom Y
     def atom2output = (x: Int) => x + 1;
-    def atom2 = (x: Int) => splitDivide(atom2output(x),_);
+    def atom2 = (x: Int) => splitDivide(atom2output(x), _);
     val resultAtom2 = () => atom2(5);
     println("Result 2")
 
@@ -43,7 +44,7 @@ object Main8 {
       val test = resultAtom2();
       test(atom3output(x))
     };
-    var resultAtom3 = (x : Int) => {
+    var resultAtom3 = (x: Int) => {
       val res = atom3(5);
       res(x)
     }
@@ -67,91 +68,11 @@ object Main8 {
     println(resultAtom4())
   }
 
-  trait QRE {
-    def accept(e:QRECreator);
-  }
-  case class AtomQRE[D,C] private(outputF: D => C, predicate: D => Boolean) extends QRE {
-    def accept(e:QRECreator): Unit = {
-      e.visitAtom(this);
-    }
-  };
 
-  case class IterQRE[A,B,C] private(child: QRE, init: B, transformF: (B,A) => B, outputF: B => C) extends QRE {
-    def accept(e:QRECreator): Unit = {
-      child.accept(e);
-      e.visitIter(this);
-    }
-  };
-
-  case class SplitQRE[A,B,C] private(childL: QRE, childR: QRE, transformF: (A,B) => C) extends QRE {
-    def accept(e:QRECreator): Unit = {
-      childL.accept(e);
-      childR.accept(e);
-      e.visitSplit(this);
-    }
-  }
-
-  trait QRECreator {
-    def visitAtom[D,C](atom: AtomQRE[D,C]);
-    def visitIter[A,B,C](iter: IterQRE[A,B,C]);
-    def visitSplit[A,B,C](split: SplitQRE[A,B,C]);
-  }
-  case class LazyQRECreator() extends QRECreator {
-    override def visitAtom[D,C](atom: AtomQRE[D,C]): Unit = {
-      println("atom")
-    }
-
-    override def visitIter[A,B,C](iter: IterQRE[A,B,C]): Unit = {
-      println("iter")
-    }
-
-    override def visitSplit[A,B,C](split: SplitQRE[A,B,C]): Unit = {
-      println("split")
-    }
-  }
-
-  def main3(args: Array[String]): Unit = {
-    val atom1 = AtomQRE[Int,Int](x => x + 1, x => x > 0);
-    val atom2 = AtomQRE[Int,Int](x => x + 1, x => x > 0);
-    val iter = IterQRE[Int,Int,Int](atom1, 5, (x, y) => x + y, x => x);
-    val split = SplitQRE[Int,Int,Int](iter, atom2, (x, y) => x + y);
-
-    atom1.accept(LazyQRECreator())
-  }
-
-  sealed trait Combinator[D,C,T] {
-    val maybeOutput: Option[() => T];
-    def next(item: D): Combinator[D,C,T];
-    def start(current: C => T): Combinator[D,C,T];
-    def start(): Combinator[D,C,C];
-  }
-
-  case class Atom[D,C,T] private(outputF: D => C, predicate: D => Boolean, current: Option[C => T], maybeOutput: Option[() => T]) extends Combinator[D,C,T] {
-
-    def this(outputF: D => C, predicate: D => Boolean) = this(outputF, predicate, None, None);
-
-    def next(item: D): Atom[D,C,T] = {
-      if(predicate(item) && current.isDefined) {
-        Atom(outputF, predicate, None, Some(() => current.get(outputF(item))));
-      } else {
-        Atom(outputF, predicate, None, None);
-      }
-    }
-
-    def start(current: C => T): Atom[D,C,T] = {
-      Atom[D,C,T](outputF, predicate, Some(current), None);
-    }
-
-    def start(): Atom[D,C,C] = {
-      Atom[D,C,C](outputF,predicate,Some(identity),None)
-    }
-  }
-
-
-  def main(args: Array[String]): Unit = {
+  def iterations(args: Array[String]): Unit = {
     //--------------iter
     val init = 20;
-    val trans = (x: Int, y: Int) => x + y;
+    val trans = (x: Int, y: Int) => x / y;
     val output = (x: Int) => x;
 
     //---------------atom
@@ -163,31 +84,217 @@ object Main8 {
     def a = (x: Int) => x;
     //start
     def b = () => a(output(init))
+
     def c = (x: Int) => {
       def h = () => trans(init, x)
+
       def i = (y: Int) => a(output(y));
-      (h,i)
+      (h, i)
     }
 
     def d = (x: Int) => c(atomOutput(x));
 
     //next 5
-    val (pTransf, out) = d(5);
+    val (pTransf, out) = d(3);
 
     //iter
     def e = () => out(pTransf());
     def f = (x: Int) => {
       def g = () => trans(pTransf(), x);
       def h = out
-      (g,h)
+
+      (g, h)
     }
 
     def g = (x: Int) => f(atomOutput(x));
-    val (pTransf2, out2) = g(6);
+    val (pTransf2, out2) = g(1);
 
     def h = () => out2(pTransf2());
 
     println(h());
+  }
+
+  def main(args: Array[String]): Unit = {
+    // split multiplication
+    //    def splitMultTransform = (x: Int, y: Int) => {
+    //      println(this.toString)
+    //      x * y
+    //    }
+    //    val currentSplitMult = splitMultTransform.curried;
+    //
+    //    // atom
+    //    def atom1output = (x: Int) => {
+    //      println(this.toString)
+    //      x + 1
+    //    };
+    //    val currentAtom1 = (x: Int) => currentSplitMult(atom1output(x));
+    //    def resultAtom1 = (x: Int) => currentAtom1(5)(x);
+    //
+    //    def atom2output = (x: Int) => {
+    //      println(this.toString)
+    //      x + 2
+    //    };
+    //    val currentAtom2 = (x: Int) => resultAtom1(atom2output(x));
+    //    def resultAtom2 = () => currentAtom2(5);
+    //
+    //    println(resultAtom2())
+    //
+//        val atom1 = AtomQRE[Int,Int](x => x + 1, x => x > 0);
+//        val atom2 = AtomQRE[Int,Int](x => x + 1, x => x < 0);
+//        val iter = IterQRE[Int,Int,Int](atom1, 5, (x, y) => x + y, x => x);
+//        val split = SplitQRE[Int,Int,Int](iter, atom2, (x, y) => x + y);
+    //
+    //    split.accept(LazyQRECreator())
+
+    val atom1 = Atom[String, Int, (() => Int) => () => String](x => {
+      println("atom1"); x.length + 3
+    }, x => x.nonEmpty, None, None)
+    val atom2 = Atom[String, Int, () => String](x => {
+      println("atom2"); x.length + 1
+    }, x => x.nonEmpty, None, None)
+    val split = Split[String, Int, Int, Int, String, () => String](atom1, atom2, (x, y) => {
+      println("split"); x + y
+    }, x => x.toString, None)
+
+
+//    val atom3 = Atom[String, Int, Int => String](x => {
+//      println("atom3"); x.length + 1
+//    }, x => x.nonEmpty, None, None)
+//    val split2 = Split[String, Int, Int, Int, String](atom3, split, (x, y) => {
+//      println("split"); x + y
+//    }, x => x.toString, None)
+
+    var eval = split.start();
+    eval = eval.next("test");
+    eval = eval.next("other test");
+    println(eval.output.get())
+  }
+
+  trait QRE {
+    def accept(e: QRECreator);
+  }
+
+  case class AtomQRE[D, C] private(outputF: D => C, predicate: D => Boolean) extends QRE {
+    def accept(e: QRECreator): Unit = {
+      e.visitAtom(this);
+    }
+  };
+
+  case class IterQRE[A, B, C] private(child: QRE, init: B, transformF: (B, A) => B, outputF: B => C) extends QRE {
+    def accept(e: QRECreator): Unit = {
+      e.visitIter(this);
+    }
+  };
+
+  case class SplitQRE[A, B, C] private(childL: QRE, childR: QRE, transformF: (A, B) => C) extends QRE {
+    def accept(e: QRECreator): Unit = {
+      e.visitSplit(this);
+    }
+  }
+
+  trait QRECreator {
+    def visitAtom[D, C](atom: AtomQRE[D, C]);
+
+    def visitIter[A, B, C](iter: IterQRE[A, B, C]);
+
+    def visitSplit[A, B, C](split: SplitQRE[A, B, C]);
+  }
+
+  case class LazyQRECreator() extends QRECreator {
+    override def visitAtom[D, C](atom: AtomQRE[D, C]): Unit = {
+      println("atom")
+    }
+
+    override def visitIter[A, B, C](iter: IterQRE[A, B, C]): Unit = {
+      println("iter")
+    }
+
+    override def visitSplit[A, B, C](split: SplitQRE[A, B, C]): Unit = {
+
+    }
+  }
+
+  sealed trait Combinator[D, C, T] {
+    val maybeOutput: Option[() => T];
+
+    def next(item: D): Combinator[D, C, T];
+
+    def start(current: C => T): Combinator[D, C, T];
+
+    def start(): Combinator[D, C, C];
+  }
+
+  case class Split[Domain, TransOp1, TransOp2, OutF, Result, Output] private
+  (childL: Atom[Domain, TransOp1, (() => TransOp2) => Output], childR: Atom[Domain, TransOp2, Output], transformF: (TransOp1, TransOp2) => OutF, outputF: OutF => Result, output: Option[Output]) {
+
+    def start(): Split[Domain, TransOp1, TransOp2, OutF, Result, () => OutF] = {
+      val newChildL = childL.create[(() => TransOp2) => () => OutF]();
+      val newChildR = childR.create[() => OutF]();
+      Split[Domain, TransOp1, TransOp2, OutF, Result, () => OutF](newChildL, newChildR, transformF, outputF, None).start(identity)
+    }
+
+    def start(fn: (() => OutF) => Output): Split[Domain, TransOp1, TransOp2, OutF, Result, Output] = {
+      def newFn(x: () => TransOp1) = (y: () => TransOp2) => fn(() => transformF.curried(x())(y()));
+
+      val newChildL = childL.start(newFn);
+      newChildL.output match {
+        case Some(childOutput) => {
+          def fn(x: () => TransOp2) = childOutput(x);
+          val newChildR = childR.start(fn);
+
+          newChildR.output match {
+            case Some(_) => Split[Domain, TransOp1, TransOp2, OutF, Result, Output](newChildL, newChildR, transformF, outputF, newChildR.output)
+            case None => Split(newChildL, newChildR, transformF, outputF, None)
+          }
+        }
+        case None => Split(newChildL, childR, transformF, outputF, None)
+      }
+    }
+
+    def next(item: Domain): Split[Domain, TransOp1, TransOp2, OutF, Result, Output] = {
+      val newChildL = childL.next(item);
+      val newChildR = childR.next(item);
+
+      val (newChildR2, output) = newChildL.output match {
+        case Some(childOutput) => restartRight(childOutput, newChildR)
+        case None => (newChildR, newChildR.output)
+      }
+      Split(newChildL, newChildR2, transformF, outputF, output)
+
+    }
+
+    private def restartRight(outputL: (() => TransOp2) => Output, newChildR: Atom[Domain, TransOp2, Output]) = {
+      def fn(x: () => TransOp2) = outputL(x);
+
+      val newChildR2 = newChildR.start(fn);
+      newChildR2.output match {
+        case Some(_) => (newChildR2, newChildR2.output)
+        case None => (newChildR2, newChildR.output)
+      }
+    }
+  }
+
+  case class Atom[Domain, OutFDomain, Output] private(outputF: Domain => OutFDomain, predicate: Domain => Boolean, current: Option[Domain => Output], output: Option[Output]) {
+
+    def start(): Atom[Domain, OutFDomain, () => OutFDomain] = {
+      Atom(outputF, predicate, Some((x: Domain) => () => outputF(x)), None);
+    }
+
+    def start(fn: (() => OutFDomain) => Output): Atom[Domain, OutFDomain, Output] = {
+      Atom(outputF, predicate, Some((x: Domain) => fn(() => outputF(x))), None);
+    }
+
+    def next(item: Domain): Atom[Domain, OutFDomain, Output] = {
+      if (predicate(item) && current.isDefined) {
+        Atom(outputF, predicate, None, current map (c => c(item)));
+      } else {
+        Atom(outputF, predicate, None, None);
+      }
+    }
+
+    def create[NewOutputType](): Atom[Domain, OutFDomain, NewOutputType] = {
+      Atom[Domain, OutFDomain, NewOutputType](outputF, predicate, None, None);
+    }
   }
 
 }
