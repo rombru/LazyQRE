@@ -146,27 +146,27 @@ object Main8 {
     //
     //    split.accept(LazyQRECreator())
 
-    val atom1 = Atom[String, Int, (() => Int) => () => String](x => {
+    val atom1 = Atom[String, Int, (() => Int) => (() => Int) => () => String](x => {
       println("atom1"); x.length + 3
     }, x => x.nonEmpty, None, None)
-    val atom2 = Atom[String, Int, () => String](x => {
+    val atom2 = Atom[String, Int, (() => Int) => () => String](x => {
       println("atom2"); x.length + 1
     }, x => x.nonEmpty, None, None)
-    val split = Split[String, Int, Int, Int, String, () => String](atom1, atom2, (x, y) => {
+    val split = Split[String, Int, Int, Int, String, (() => Int) => () => String](atom1, atom2, (x, y) => {
       println("split"); x + y
     }, x => x.toString, None)
 
+    val atom3 = Atom[String, Int, () => String](x => {
+      println("atom2"); x.length + 1
+    }, x => x.nonEmpty, None, None)
+    val split2 = Split[String, Int, Int, Int, String, () => String](split, atom3, (x, y) => {
+      println("split"); x + y
+    }, x => x.toString, None)
 
-//    val atom3 = Atom[String, Int, Int => String](x => {
-//      println("atom3"); x.length + 1
-//    }, x => x.nonEmpty, None, None)
-//    val split2 = Split[String, Int, Int, Int, String](atom3, split, (x, y) => {
-//      println("split"); x + y
-//    }, x => x.toString, None)
-
-    var eval = split.start();
-    eval = eval.next("test");
-    eval = eval.next("other test");
+    var eval = split2.start();
+    eval = eval.next("patrick");
+    eval = eval.next("michel");
+    eval = eval.next("alexandre");
     println(eval.output.get())
   }
 
@@ -214,18 +214,21 @@ object Main8 {
     }
   }
 
-  sealed trait Combinator[D, C, T] {
-    val maybeOutput: Option[() => T];
+  sealed trait Combinator[Domain, FnDomain, Output] {
+    val output: Option[Output];
 
-    def next(item: D): Combinator[D, C, T];
+    def next(item: Domain): Combinator[Domain, FnDomain, Output];
 
-    def start(current: C => T): Combinator[D, C, T];
+    def start(current: (() => FnDomain) => Output): Combinator[Domain, FnDomain, Output];
 
-    def start(): Combinator[D, C, C];
+    def start(): Combinator[Domain, FnDomain, () => FnDomain];
+
+    def create[NewOutputType](): Combinator[Domain, FnDomain, NewOutputType];
   }
 
   case class Split[Domain, TransOp1, TransOp2, OutF, Result, Output] private
-  (childL: Atom[Domain, TransOp1, (() => TransOp2) => Output], childR: Atom[Domain, TransOp2, Output], transformF: (TransOp1, TransOp2) => OutF, outputF: OutF => Result, output: Option[Output]) {
+  (childL: Combinator[Domain, TransOp1, (() => TransOp2) => Output], childR: Combinator[Domain, TransOp2, Output], transformF: (TransOp1, TransOp2) => OutF, outputF: OutF => Result, output: Option[Output])
+    extends Combinator[Domain, OutF, Output] {
 
     def start(): Split[Domain, TransOp1, TransOp2, OutF, Result, () => OutF] = {
       val newChildL = childL.create[(() => TransOp2) => () => OutF]();
@@ -263,7 +266,7 @@ object Main8 {
 
     }
 
-    private def restartRight(outputL: (() => TransOp2) => Output, newChildR: Atom[Domain, TransOp2, Output]) = {
+    private def restartRight(outputL: (() => TransOp2) => Output, newChildR: Combinator[Domain, TransOp2, Output]) = {
       def fn(x: () => TransOp2) = outputL(x);
 
       val newChildR2 = newChildR.start(fn);
@@ -272,9 +275,14 @@ object Main8 {
         case None => (newChildR2, newChildR.output)
       }
     }
+
+    def create[NewOutputType](): Split[Domain, TransOp1, TransOp2, OutF, Result, NewOutputType] = {
+      Split[Domain, TransOp1, TransOp2, OutF, Result, NewOutputType](childL.create[(() => TransOp2) => NewOutputType](), childR.create[NewOutputType](), transformF, outputF, None);
+    }
   }
 
-  case class Atom[Domain, OutFDomain, Output] private(outputF: Domain => OutFDomain, predicate: Domain => Boolean, current: Option[Domain => Output], output: Option[Output]) {
+  case class Atom[Domain, OutFDomain, Output] private(outputF: Domain => OutFDomain, predicate: Domain => Boolean, current: Option[Domain => Output], output: Option[Output])
+    extends Combinator[Domain, OutFDomain, Output] {
 
     def start(): Atom[Domain, OutFDomain, () => OutFDomain] = {
       Atom(outputF, predicate, Some((x: Domain) => () => outputF(x)), None);
