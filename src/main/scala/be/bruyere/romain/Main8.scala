@@ -1,25 +1,40 @@
 package be.bruyere.romain
 
+import scala.annotation.tailrec
+
 object Main8 {
 
 
   def main(args: Array[String]): Unit = {
 
     val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
-    val atom2 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
-    val iter = IterQRE[String, Int, Int, Int](atom2, 20, (x, y) => x / y, x => x)
+    val atom2 = AtomQRE[String, Int](x => x.length, x => x.length > 20)
+    val atom2b = AtomQRE[String, Int](x => 20, x => x.length <= 20)
+    val else1 = ElseQRE[String, Int](atom2, atom2b)
+    val iter = IterQRE[String, Int, Int, Int](else1, 20, (x, y) => x + y, x => x)
     val split = SplitQRE[String, Int, Int, Int, String](atom1, iter, (x, y) => x + y, x => x.toString)
     val atom3 = AtomQRE[String, Int](x => x.length, x => x.isEmpty)
     val split2 = SplitQRE[String, String, Int, String, String](split, atom3, (x, y) => x * y, x => x)
     val iter2 = IterQRE[String, String, String, String](split2, "10", (x, y) => x.concat(y) , x => x)
+    val apply = ApplyQRE[String, String, String](iter2, x => x.concat("apply"))
 
-    var eval = iter2.start()
-    eval = eval.next("aa")
-    eval = eval.next("aa")
-    eval = eval.next("aaaaa")
-    eval = eval.next("aaaaaaaaaa")
-    eval = eval.next("")
-    println(eval.result())
+    val eval = iter.start()
+    val list = List("aaa","aaaaa","aaaaaaaaaa","ss","");
+    executeOnList[String,Int](list, eval, (sc: StartingCombinator[String,Int,() => Int]) => {
+      println("Result = " + sc.result())
+      println("ResultFn = " + sc.resultFn())
+    })
+  }
+
+  @tailrec
+  def executeOnList[D,C](list: List[D], sc: StartingCombinator[D, C,() => C], fn: (StartingCombinator[D, C,() => C]) => Unit): Unit = {
+    list match {
+      case Nil => ()
+      case head :: tail =>
+        val newSc = sc.next(head)
+        fn(newSc);
+        executeOnList(tail, newSc, fn)
+    }
   }
 
   trait QRE[Domain, Cost] {
@@ -34,6 +49,20 @@ object Main8 {
 
     override def create[Output](): Combinator[Domain, OutFDomain, Output] = {
       Atom[Domain, OutFDomain, Output](outputF, predicate, None, None)
+    }
+  }
+
+  case class ApplyQRE[Domain, TransOp, OutFDomain] private(child: QRE[Domain, TransOp], outputF: TransOp => OutFDomain) extends QRE[Domain, OutFDomain] {
+
+    override def create[Output](): Combinator[Domain, OutFDomain, Output] = {
+      Apply[Domain, TransOp, OutFDomain, Output](child.create(),outputF, None)
+    }
+  }
+
+  case class ElseQRE[Domain, Result] private(child1: QRE[Domain, Result], child2: QRE[Domain, Result]) extends QRE[Domain, Result] {
+
+    override def create[Output](): Combinator[Domain, Result, Output] = {
+      Else[Domain, Result, Output](child1.create(),child2.create(), None)
     }
   }
 
@@ -55,7 +84,8 @@ object Main8 {
 
   implicit class StartingCombinator[Domain, FnDomain, Output <: () => FnDomain](combinator: Combinator[Domain, FnDomain, Output]) {
     def next(item: Domain): Combinator[Domain, FnDomain, Output] = combinator.next(item);
-    def result(): Any = combinator.output map(o => o())
+    def result(): Option[FnDomain] = combinator.output map(o => o())
+    def resultFn(): Option[() => FnDomain] = combinator.output
   }
 
   sealed trait Combinator[Domain, FnDomain, Output] {
@@ -149,6 +179,33 @@ object Main8 {
         (trans, out)
       }
       Iter(child.start(newFn), init, transformF, outputF, Some(fn(() => outputF(init))))
+    }
+  }
+
+  case class Apply[Domain,TransOp,OutF,Output] private(child: Combinator[Domain,TransOp,Output], outputF: TransOp => OutF, output: Option[Output]) extends Combinator[Domain,OutF,Output] {
+    override def next(item: Domain): Combinator[Domain, OutF, Output] = {
+      val newChild = child.next(item)
+      Apply(newChild, outputF, newChild.output)
+    }
+
+    override def start(fn: (() => OutF) => Output): Combinator[Domain, OutF, Output] = {
+      def newFn(x: () => TransOp) = fn(() => outputF(x()))
+      val newChild = child.start(newFn)
+      Apply(newChild, outputF, newChild.output)
+    }
+  }
+
+  case class Else[Domain,Result,Output] private(child1: Combinator[Domain,Result,Output], child2: Combinator[Domain,Result,Output], output: Option[Output]) extends Combinator[Domain,Result,Output] {
+    override def next(item: Domain): Combinator[Domain, Result, Output] = {
+      val newChild1 = child1.next(item)
+      val newChild2 = child2.next(item)
+      Else(newChild1, newChild2, newChild1.output orElse newChild2.output)
+    }
+
+    override def start(fn: (() => Result) => Output): Combinator[Domain, Result, Output] = {
+      val newChild1 = child1.start(fn)
+      val newChild2 = child2.start(fn)
+      Else(newChild1, newChild2, newChild1.output orElse newChild2.output)
     }
   }
 }
