@@ -7,19 +7,23 @@ object Main8 {
 
   def main(args: Array[String]): Unit = {
 
-    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
-    val atom2 = AtomQRE[String, Int](x => x.length, x => x.length > 20)
-    val atom2b = AtomQRE[String, Int](x => 20, x => x.length <= 20)
-    val else1 = ElseQRE[String, Int](atom2, atom2b)
-    val iter = IterQRE[String, Int, Int, Int](else1, 20, (x, y) => x + y, x => x)
-    val split = SplitQRE[String, Int, Int, Int, String](atom1, iter, (x, y) => x + y, x => x.toString)
-    val atom3 = AtomQRE[String, Int](x => x.length, x => x.isEmpty)
-    val split2 = SplitQRE[String, String, Int, String, String](split, atom3, (x, y) => x * y, x => x)
-    val iter2 = IterQRE[String, String, String, String](split2, "10", (x, y) => x.concat(y) , x => x)
-    val apply = ApplyQRE[String, String, String](iter2, x => x.concat("apply"))
+//    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
+//    val atom2 = AtomQRE[String, Int](x => x.length, x => x.length > 20)
+//    val atom2b = AtomQRE[String, Int](x => 20, x => x.length <= 20)
+//    val else1 = ElseQRE[String, Int](atom2, atom2b)
+//    val iter = IterQRE[String, Int, Int, Int](else1, 20, (x, y) => x + y, x => x)
+//    val split = SplitQRE[String, Int, Int, Int, String](atom1, iter, (x, y) => x + y, x => x.toString)
+//    val atom3 = AtomQRE[String, Int](x => x.length, x => x.isEmpty)
+//    val split2 = SplitQRE[String, String, Int, String, String](split, atom3, (x, y) => x * y, x => x)
+//    val iter2 = IterQRE[String, String, String, String](split2, "10", (x, y) => x.concat(y) , x => x)
+//    val apply = ApplyQRE[String, String, String](iter2, x => x.concat("apply"))
 
-    val eval = iter.start()
-    val list = List("aaa","aaaaa","aaaaaaaaaa","ss","");
+    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
+    val atom2 = AtomQRE[Int, Int](x => x + 5, x => x > 2)
+    val comp = StreamingCompositionQRE[String,() => Int, Int, Int](atom1, atom2);
+
+    val eval = comp.start()
+    val list = List("aaaaaa","aaaaa");
     executeOnList[String,Int](list, eval, (sc: StartingCombinator[String,Int,() => Int]) => {
       println("Result = " + sc.result())
       println("ResultFn = " + sc.resultFn())
@@ -59,6 +63,13 @@ object Main8 {
     }
   }
 
+  case class StreamingCompositionQRE[Domain1,Output1 <: () => Domain2,Domain2,Result2] private(child1: QRE[Domain1, Domain2], child2: QRE[Domain2, Result2]) extends QRE[Domain1, Result2] {
+
+    override def create[Output2](): Combinator[Domain1, Result2, Output2] = {
+      StreamingCompose[Domain1,Output1,Domain2,Result2,Output2](child1.create(),child2.create(), None)
+    }
+  }
+
   case class ElseQRE[Domain, Result] private(child1: QRE[Domain, Result], child2: QRE[Domain, Result]) extends QRE[Domain, Result] {
 
     override def create[Output](): Combinator[Domain, Result, Output] = {
@@ -78,12 +89,12 @@ object Main8 {
     override def create[Output](): Combinator[Domain, Result, Output] = {
       val left = childL.create[(() => TransOp2) => Output]()
       val right = childR.create[Output]()
-      Split(left, right, transformF, outputF, None);
+      Split(left, right, transformF, outputF, None)
     }
   }
 
   implicit class StartingCombinator[Domain, FnDomain, Output <: () => FnDomain](combinator: Combinator[Domain, FnDomain, Output]) {
-    def next(item: Domain): Combinator[Domain, FnDomain, Output] = combinator.next(item);
+    def next(item: Domain): Combinator[Domain, FnDomain, Output] = combinator.next(item)
     def result(): Option[FnDomain] = combinator.output map(o => o())
     def resultFn(): Option[() => FnDomain] = combinator.output
   }
@@ -206,6 +217,31 @@ object Main8 {
       val newChild1 = child1.start(fn)
       val newChild2 = child2.start(fn)
       Else(newChild1, newChild2, newChild1.output orElse newChild2.output)
+    }
+  }
+
+  case class StreamingCompose[Domain1,Output1 <: () => Domain2,Domain2,Result2,Output2] private(child1: Combinator[Domain1,Domain2,() => Domain2], child2: Combinator[Domain2,Result2,Output2], output: Option[Output2]) extends Combinator[Domain1,Result2,Output2] {
+    override def next(item: Domain1): Combinator[Domain1, Result2, Output2] = {
+      val newChild1 = child1.next(item)
+      newChild1.output match {
+        case Some(out) =>
+          val newChild2 = child2.next(out())
+          StreamingCompose(newChild1, newChild2, newChild2.output)
+        case None => StreamingCompose(newChild1, child2, None)
+      }
+    }
+
+    override def start(fn: (() => Result2) => Output2): Combinator[Domain1, Result2, Output2] = {
+      val newChild1 = child1.start(identity)
+      val newChild2 = child2.start(fn)
+
+      newChild1.output match {
+        case Some(out) =>
+          val newChild2 = child2.next(out())
+          StreamingCompose(newChild1, newChild2, newChild2.output)
+        case None =>
+          StreamingCompose(newChild1, newChild2, None)
+      }
     }
   }
 }
