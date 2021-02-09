@@ -21,10 +21,10 @@ object Main8 {
     val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
     val iter1 = IterQRE[String, Int, Int, Int](atom1, 0, (x,y) => x + y, x => x)
     val atom2 = AtomQRE[Int, Int](x => x + 5, x => true)
-    val atom3 = AtomQRE[Int, Int](x => x + 10, x => true)
+    val atom3 = AtomQRE[Int, Int](x => x + 10, _ => true)
     val combine = CombineQRE[Int,Int,Int,Int](atom2, atom3, (x,y) => x * y)
     val iter2 = IterQRE[Int, Int, Int, Int](combine, 0, (x,y) => x + y, x => x)
-    val streamcomp = StreamingCompositionQRE[String, () => Int, Int, Int](iter1, iter2)
+    val streamcomp = StreamingCompositionQRE[String, Int, Int](iter1, iter2)
 
     val eval = streamcomp.start()
     val list = List("aaaaaa", "aaaaa");
@@ -45,104 +45,102 @@ object Main8 {
     }
   }
 
-  trait QRE[Domain, Cost] {
-    def start(): StartingCombinator[Domain, Cost, () => Cost] = {
-      create[() => Cost]().start(identity)
+  trait QRE[In, Out] {
+    def start(): StartingCombinator[In, Out, () => Out] = {
+      create[() => Out]().start(identity)
     };
 
-    protected[Main8] def create[Output](): Combinator[Domain, Cost, Output];
+    protected[Main8] def create[Fn](): Combinator[In, Out, Fn];
   }
 
-  case class AtomQRE[Domain, OutFDomain] private(outputF: Domain => OutFDomain, predicate: Domain => Boolean) extends QRE[Domain, OutFDomain] {
+  case class AtomQRE[In, Out] private(outputF: In => Out, predicate: In => Boolean) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, OutFDomain, Output] = {
-      Atom[Domain, OutFDomain, Output](outputF, predicate, None, None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Atom[In, Out, Fn](outputF, predicate, None, None)
     }
   }
 
-  case class ApplyQRE[Domain, TransOp, OutFDomain] private(child: QRE[Domain, TransOp], outputF: TransOp => OutFDomain) extends QRE[Domain, OutFDomain] {
+  case class ApplyQRE[In, ChildOut, Out] private(child: QRE[In, ChildOut], outputF: ChildOut => Out) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, OutFDomain, Output] = {
-      Apply[Domain, TransOp, OutFDomain, Output](child.create(), outputF, None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Apply[In, ChildOut, Out, Fn](child.create(), outputF, None)
     }
   }
 
-  case class CombineQRE[Domain, Result1, Result2, OutF] private(child1: QRE[Domain, Result1], child2: QRE[Domain, Result2], transformF: (Result1,Result2) => OutF) extends QRE[Domain, OutF] {
+  case class CombineQRE[In, Child1Out, Child2Out, Out] private(child1: QRE[In, Child1Out], child2: QRE[In, Child2Out], transformF: (Child1Out,Child2Out) => Out) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, OutF, Output] = {
-      Combine[Domain, Result1, Result2, OutF, Output](child1.create(), child2.create(), transformF, None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Combine[In, Child1Out, Child2Out, Out, Fn](child1.create(), child2.create(), transformF, None)
     }
   }
 
-  case class StreamingCompositionQRE[Domain1, Output1 <: () => Domain2, Domain2, Result2] private(child1: QRE[Domain1, Domain2], child2: QRE[Domain2, Result2]) extends QRE[Domain1, Result2] {
+  case class StreamingCompositionQRE[In, Child1Out, Out] private(child1: QRE[In, Child1Out], child2: QRE[Child1Out, Out]) extends QRE[In, Out] {
 
-    override def create[Output2](): Combinator[Domain1, Result2, Output2] = {
-      StreamingCompose[Domain1, Output1, Domain2, Result2, Output2](child1.create(), child2.create(), None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      StreamingCompose[In, Child1Out, Out, Fn](child1.create(), child2.create(), None)
     }
   }
 
-  case class ElseQRE[Domain, Result] private(child1: QRE[Domain, Result], child2: QRE[Domain, Result]) extends QRE[Domain, Result] {
+  case class ElseQRE[In, Out] private(child1: QRE[In, Out], child2: QRE[In, Out]) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, Result, Output] = {
-      Else[Domain, Result, Output](child1.create(), child2.create(), None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Else[In, Out, Fn](child1.create(), child2.create(), None)
     }
   }
 
-  case class IterQRE[Domain, TransOp, AggOp, OutF] private(child: QRE[Domain, TransOp], init: AggOp, transformF: (AggOp, TransOp) => AggOp, outputF: AggOp => OutF) extends QRE[Domain, OutF] {
+  case class IterQRE[In, ChildOut, Agg, Out] private(child: QRE[In, ChildOut], init: Agg, transformF: (Agg, ChildOut) => Agg, outputF: Agg => Out) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, OutF, Output] = {
-      Iter[Domain, TransOp, AggOp, OutF, Output](child.create(), init, transformF, outputF, None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Iter[In, ChildOut, Agg, Out, Fn](child.create(), init, transformF, outputF, None)
     }
   }
 
-  case class SplitQRE[Domain, TransOp1, TransOp2, OutF, Result] private(childL: QRE[Domain, TransOp1], childR: QRE[Domain, TransOp2], transformF: (TransOp1, TransOp2) => OutF, outputF: OutF => Result) extends QRE[Domain, Result] {
+  case class SplitQRE[In, ChildLOut, ChildROut, Agg, Out] private(childL: QRE[In, ChildLOut], childR: QRE[In, ChildROut], transformF: (ChildLOut, ChildROut) => Agg, outputF: Agg => Out) extends QRE[In, Out] {
 
-    override def create[Output](): Combinator[Domain, Result, Output] = {
-      val left = childL.create[(() => TransOp2) => Output]()
-      val right = childR.create[Output]()
-      Split(left, right, transformF, outputF, None)
+    override def create[Fn](): Combinator[In, Out, Fn] = {
+      Split[In, ChildLOut, ChildROut, Agg, Out, Fn](childL.create(), childR.create(), transformF, outputF, None)
     }
   }
 
-  implicit class StartingCombinator[Domain, FnDomain, Output <: () => FnDomain](combinator: Combinator[Domain, FnDomain, Output]) {
-    def next(item: Domain): Combinator[Domain, FnDomain, Output] = combinator.next(item)
+  implicit class StartingCombinator[In, Out, Fn <: () => Out](combinator: Combinator[In, Out, Fn]) {
+    def next(item: In): Combinator[In, Out, Fn] = combinator.next(item)
 
-    def result(): Option[FnDomain] = combinator.output map (o => o())
+    def result(): Option[Out] = combinator.output map (o => o())
 
-    def resultFn(): Option[() => FnDomain] = combinator.output
+    def resultFn(): Option[() => Out] = combinator.output
   }
 
-  sealed trait Combinator[Domain, FnDomain, Output] {
-    val output: Option[Output]
+  sealed trait Combinator[In, Out, Fn] {
+    val output: Option[Fn]
 
-    def next(item: Domain): Combinator[Domain, FnDomain, Output]
+    def next(item: In): Combinator[In, Out, Fn]
 
-    def start(current: (() => FnDomain) => Output): Combinator[Domain, FnDomain, Output]
+    def start(current: (() => Out) => Fn): Combinator[In, Out, Fn]
   }
 
-  case class Split[Domain, TransOp1, TransOp2, OutF, Result, Output] private
-  (childL: Combinator[Domain, TransOp1, (() => TransOp2) => Output], childR: Combinator[Domain, TransOp2, Output], transformF: (TransOp1, TransOp2) => OutF, outputF: OutF => Result, output: Option[Output])
-    extends Combinator[Domain, Result, Output] {
+  case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
+  (childL: Combinator[In, ChildLOut, (() => ChildROut) => Fn], childR: Combinator[In, ChildROut, Fn], transformF: (ChildLOut, ChildROut) => Agg, outputF: Agg => Out, output: Option[Fn])
+    extends Combinator[In, Out, Fn] {
 
-    def start(fn: (() => Result) => Output): Split[Domain, TransOp1, TransOp2, OutF, Result, Output] = {
-      def newFn(x: () => TransOp1) = (y: () => TransOp2) => fn(() => outputF(transformF.curried(x())(y())))
+    def start(fn: (() => Out) => Fn): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
+      def newFn(x: () => ChildLOut) = (y: () => ChildROut) => fn(() => outputF(transformF.curried(x())(y())))
 
       val newChildL = childL.start(newFn)
       newChildL.output match {
         case Some(childOutput) =>
-          def fn(x: () => TransOp2) = childOutput(x)
+          def fn(x: () => ChildROut) = childOutput(x)
 
           val newChildR = childR.start(fn)
 
           newChildR.output match {
-            case Some(_) => Split[Domain, TransOp1, TransOp2, OutF, Result, Output](newChildL, newChildR, transformF, outputF, newChildR.output)
+            case Some(_) => Split[In, ChildLOut, ChildROut, Agg, Out, Fn](newChildL, newChildR, transformF, outputF, newChildR.output)
             case None => Split(newChildL, newChildR, transformF, outputF, None)
           }
         case None => Split(newChildL, childR, transformF, outputF, None)
       }
     }
 
-    def next(item: Domain): Split[Domain, TransOp1, TransOp2, OutF, Result, Output] = {
+    def next(item: In): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
       val newChildL = childL.next(item)
       val newChildR = childR.next(item)
 
@@ -154,8 +152,8 @@ object Main8 {
 
     }
 
-    private def restartRight(outputL: (() => TransOp2) => Output, newChildR: Combinator[Domain, TransOp2, Output]) = {
-      def fn(x: () => TransOp2) = outputL(x)
+    private def restartRight(outputL: (() => ChildROut) => Fn, newChildR: Combinator[In, ChildROut, Fn]) = {
+      def fn(x: () => ChildROut) = outputL(x)
 
       val newChildR2 = newChildR.start(fn)
 
@@ -166,14 +164,14 @@ object Main8 {
     }
   }
 
-  case class Atom[Domain, OutFDomain, Output] private(outputF: Domain => OutFDomain, predicate: Domain => Boolean, current: Option[Domain => Output], output: Option[Output])
-    extends Combinator[Domain, OutFDomain, Output] {
+  case class Atom[In, Out, Fn] private(outputF: In => Out, predicate: In => Boolean, current: Option[In => Fn], output: Option[Fn])
+    extends Combinator[In, Out, Fn] {
 
-    def start(fn: (() => OutFDomain) => Output): Atom[Domain, OutFDomain, Output] = {
-      Atom(outputF, predicate, Some((x: Domain) => fn(() => outputF(x))), None)
+    def start(fn: (() => Out) => Fn): Atom[In, Out, Fn] = {
+      Atom(outputF, predicate, Some((x: In) => fn(() => outputF(x))), None)
     }
 
-    def next(item: Domain): Atom[Domain, OutFDomain, Output] = {
+    def next(item: In): Atom[In, Out, Fn] = {
       if (predicate(item) && current.isDefined) {
         Atom(outputF, predicate, None, current map (c => c(item)))
       } else {
@@ -182,12 +180,12 @@ object Main8 {
     }
   }
 
-  case class Iter[Domain, TransOp, AggOp, OutF, Output] private(child: Combinator[Domain, TransOp, (() => AggOp, (() => AggOp) => Output)], init: AggOp, transformF: (AggOp, TransOp) => AggOp, outputF: AggOp => OutF, output: Option[Output]) extends Combinator[Domain, OutF, Output] {
-    override def next(item: Domain): Combinator[Domain, OutF, Output] = {
+  case class Iter[In, ChildOut, Agg, Out, Fn] private(child: Combinator[In, ChildOut, (() => Agg, (() => Agg) => Fn)], init: Agg, transformF: (Agg, ChildOut) => Agg, outputF: Agg => Out, output: Option[Fn]) extends Combinator[In, Out, Fn] {
+    override def next(item: In): Combinator[In, Out, Fn] = {
       val newChild = child.next(item)
       newChild.output match {
         case Some((trans, out)) =>
-          def newFn(x: () => TransOp) = {
+          def newFn(x: () => ChildOut) = {
             def newTrans = () => transformF.curried(trans())(x())
 
             (newTrans, out)
@@ -198,11 +196,11 @@ object Main8 {
       }
     }
 
-    override def start(fn: (() => OutF) => Output): Combinator[Domain, OutF, Output] = {
-      def newFn(x: () => TransOp) = {
+    override def start(fn: (() => Out) => Fn): Combinator[In, Out, Fn] = {
+      def newFn(x: () => ChildOut) = {
         def trans = () => transformF.curried(init)(x())
 
-        def out = (y: () => AggOp) => fn(() => outputF(y()))
+        def out = (y: () => Agg) => fn(() => outputF(y()))
 
         (trans, out)
       }
@@ -211,44 +209,44 @@ object Main8 {
     }
   }
 
-  case class Apply[Domain, TransOp, OutF, Output] private(child: Combinator[Domain, TransOp, Output], outputF: TransOp => OutF, output: Option[Output]) extends Combinator[Domain, OutF, Output] {
-    override def next(item: Domain): Combinator[Domain, OutF, Output] = {
+  case class Apply[In, ChildOut, Out, Fn] private(child: Combinator[In, ChildOut, Fn], outputF: ChildOut => Out, output: Option[Fn]) extends Combinator[In, Out, Fn] {
+    override def next(item: In): Combinator[In, Out, Fn] = {
       val newChild = child.next(item)
       Apply(newChild, outputF, newChild.output)
     }
 
-    override def start(fn: (() => OutF) => Output): Combinator[Domain, OutF, Output] = {
-      def newFn(x: () => TransOp) = fn(() => outputF(x()))
+    override def start(fn: (() => Out) => Fn): Combinator[In, Out, Fn] = {
+      def newFn(x: () => ChildOut) = fn(() => outputF(x()))
 
       val newChild = child.start(newFn)
       Apply(newChild, outputF, newChild.output)
     }
   }
 
-  case class Else[Domain, Result, Output] private(child1: Combinator[Domain, Result, Output], child2: Combinator[Domain, Result, Output], output: Option[Output]) extends Combinator[Domain, Result, Output] {
-    override def next(item: Domain): Combinator[Domain, Result, Output] = {
+  case class Else[In, Out, Fn] private(child1: Combinator[In, Out, Fn], child2: Combinator[In, Out, Fn], output: Option[Fn]) extends Combinator[In, Out, Fn] {
+    override def next(item: In): Combinator[In, Out, Fn] = {
       val newChild1 = child1.next(item)
       val newChild2 = child2.next(item)
       Else(newChild1, newChild2, newChild1.output orElse newChild2.output)
     }
 
-    override def start(fn: (() => Result) => Output): Combinator[Domain, Result, Output] = {
+    override def start(fn: (() => Out) => Fn): Combinator[In, Out, Fn] = {
       val newChild1 = child1.start(fn)
       val newChild2 = child2.start(fn)
       Else(newChild1, newChild2, newChild1.output orElse newChild2.output)
     }
   }
 
-  case class Combine[Domain, Result1, Result2, OutF, Output] private(child1: Combinator[Domain, Result1, (() => Result2) => Output], child2: Combinator[Domain, Result2, () => Result2], transformF: (Result1, Result2) => OutF, output: Option[Output]) extends Combinator[Domain, OutF, Output] {
-    override def next(item: Domain): Combinator[Domain, OutF, Output] = {
+  case class Combine[In, Child1Out, Child2Out, Out, Fn] private(child1: Combinator[In, Child1Out, (() => Child2Out) => Fn], child2: Combinator[In, Child2Out, () => Child2Out], transformF: (Child1Out, Child2Out) => Out, output: Option[Fn]) extends Combinator[In, Out, Fn] {
+    override def next(item: In): Combinator[In, Out, Fn] = {
       val newChild1 = child1.next(item)
       val newChild2 = child2.next(item)
       Combine(newChild1, newChild2, transformF, getOutput(newChild1, newChild2))
     }
 
-    override def start(fn: (() => OutF) => Output): Combinator[Domain, OutF, Output] = {
-      def newFn(x: () => Result1) = {
-        (y: () => Result2) => fn(() => transformF.curried(x())(y()))
+    override def start(fn: (() => Out) => Fn): Combinator[In, Out, Fn] = {
+      def newFn(x: () => Child1Out) = {
+        (y: () => Child2Out) => fn(() => transformF.curried(x())(y()))
       }
 
       val newChild1 = child1.start(newFn)
@@ -256,25 +254,25 @@ object Main8 {
       Combine(newChild1, newChild2, transformF, getOutput(newChild1, newChild2))
     }
 
-    private def getOutput(newChild1: Combinator[Domain, Result1, (() => Result2) => Output], newChild2: Combinator[Domain, Result2, () => Result2]) = {
+    private def getOutput(newChild1: Combinator[In, Child1Out, (() => Child2Out) => Fn], newChild2: Combinator[In, Child2Out, () => Child2Out]) = {
       for {out1 <- newChild1.output; out2 <- newChild2.output}
         yield out1.apply(out2)
     }
   }
 
-  case class StreamingCompose[Domain1, Output1 <: () => Domain2, Domain2, Result2, Output2] private(child1: Combinator[Domain1, Domain2, () => Domain2], child2: Combinator[Domain2, Result2, Output2], output: Option[Output2]) extends Combinator[Domain1, Result2, Output2] {
-    override def next(item: Domain1): Combinator[Domain1, Result2, Output2] = {
+  case class StreamingCompose[In, Child1Out, Out, Fn] private(child1: Combinator[In, Child1Out, () => Child1Out], child2: Combinator[Child1Out, Out, Fn], output: Option[Fn]) extends Combinator[In, Out, Fn] {
+    override def next(item: In): Combinator[In, Out, Fn] = {
       val newChild1 = child1.next(item)
       strcompose(newChild1, child2)
     }
 
-    override def start(fn: (() => Result2) => Output2): Combinator[Domain1, Result2, Output2] = {
+    override def start(fn: (() => Out) => Fn): Combinator[In, Out, Fn] = {
       val newChild1 = child1.start(identity)
       val newChild2 = child2.start(fn)
       strcompose(newChild1, newChild2)
     }
 
-    private def strcompose(child1: Combinator[Domain1, Domain2, () => Domain2], child2: Combinator[Domain2, Result2, Output2]) = {
+    private def strcompose(child1: Combinator[In, Child1Out, () => Child1Out], child2: Combinator[Child1Out, Out, Fn]) = {
       child1.output match {
         case Some(out) =>
           val newChild2 = child2.next(out())
