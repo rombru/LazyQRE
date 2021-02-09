@@ -19,12 +19,14 @@ object Main8 {
     //    val apply = ApplyQRE[String, String, String](iter2, x => x.concat("apply"))
 
     val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
-    val atom2 = AtomQRE[Int, Int](x => x + 5, x => x > 2)
-    val atom3 = AtomQRE[Int, Int](x => x + 10, x => x > 2)
-    val combine = CombineQRE[Int,Int,Int,Int](atom2, atom3, (x,y) => x * y);
-    val comp = StreamingCompositionQRE[String, () => Int, Int, Int](atom1, combine);
+    val iter1 = IterQRE[String, Int, Int, Int](atom1, 0, (x,y) => x + y, x => x)
+    val atom2 = AtomQRE[Int, Int](x => x + 5, x => true)
+    val atom3 = AtomQRE[Int, Int](x => x + 10, x => true)
+    val combine = CombineQRE[Int,Int,Int,Int](atom2, atom3, (x,y) => x * y)
+    val iter2 = IterQRE[Int, Int, Int, Int](combine, 0, (x,y) => x + y, x => x)
+    val streamcomp = StreamingCompositionQRE[String, () => Int, Int, Int](iter1, iter2)
 
-    val eval = comp.start()
+    val eval = streamcomp.start()
     val list = List("aaaaaa", "aaaaa");
     executeOnList[String, Int](list, eval, (sc: StartingCombinator[String, Int, () => Int]) => {
       println("Result = " + sc.result())
@@ -277,8 +279,8 @@ object Main8 {
 
       newChild1.output match {
         case Some(out) =>
-          val newChild2 = child2.next(out())
-          StreamingCompose(newChild1, newChild2, newChild2.output)
+          val newChild2b = newChild2.next(out())
+          StreamingCompose(newChild1, newChild2b, newChild2b.output)
         case None =>
           StreamingCompose(newChild1, newChild2, None)
       }
