@@ -265,24 +265,22 @@ object Main8 {
   case class StreamingCompose[Domain1, Output1 <: () => Domain2, Domain2, Result2, Output2] private(child1: Combinator[Domain1, Domain2, () => Domain2], child2: Combinator[Domain2, Result2, Output2], output: Option[Output2]) extends Combinator[Domain1, Result2, Output2] {
     override def next(item: Domain1): Combinator[Domain1, Result2, Output2] = {
       val newChild1 = child1.next(item)
-      newChild1.output match {
-        case Some(out) =>
-          val newChild2 = child2.next(out())
-          StreamingCompose(newChild1, newChild2, newChild2.output)
-        case None => StreamingCompose(newChild1, child2, None)
-      }
+      strcompose(newChild1, child2)
     }
 
     override def start(fn: (() => Result2) => Output2): Combinator[Domain1, Result2, Output2] = {
       val newChild1 = child1.start(identity)
       val newChild2 = child2.start(fn)
+      strcompose(newChild1, newChild2)
+    }
 
-      newChild1.output match {
+    private def strcompose(child1: Combinator[Domain1, Domain2, () => Domain2], child2: Combinator[Domain2, Result2, Output2]) = {
+      child1.output match {
         case Some(out) =>
-          val newChild2b = newChild2.next(out())
-          StreamingCompose(newChild1, newChild2b, newChild2b.output)
+          val newChild2 = child2.next(out())
+          StreamingCompose(child1, newChild2, newChild2.output)
         case None =>
-          StreamingCompose(newChild1, newChild2, None)
+          StreamingCompose(child1, child2, None)
       }
     }
   }
