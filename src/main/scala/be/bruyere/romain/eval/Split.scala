@@ -1,16 +1,19 @@
 package be.bruyere.romain.eval
 
 case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
-(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], transformF: (ChildLOut, ChildROut) => Agg, outputF: Agg => Out, output: Option[Fn])
+(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], transformF: () => ((ChildLOut, ChildROut) => Agg), outputF: () => Agg => Out, output: Option[Fn])
   extends Eval[In, Out, Fn] {
 
   def start(fn: (() => Out) => Fn): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
-    def newFn(x: () => ChildLOut) = (y: () => ChildROut) => fn(() => outputF(transformF.curried(x())(y())))
+    val oF = outputF();
+    val tF = transformF();
+
+    val newFn = (x: () => ChildLOut) => (y: () => ChildROut) => fn(() => oF(tF.curried(x())(y())))
 
     val newChildL = childL.start(newFn)
     newChildL.output match {
       case Some(childOutput) =>
-        def fn(x: () => ChildROut) = childOutput(x)
+        val fn = (x: () => ChildROut) => childOutput(x)
 
         val newChildR = childR.start(fn)
 
@@ -35,7 +38,7 @@ case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
   }
 
   private def restartRight(outputL: (() => ChildROut) => Fn, newChildR: Eval[In, ChildROut, Fn]) = {
-    def fn(x: () => ChildROut) = outputL(x)
+    val fn = (x: () => ChildROut) => outputL(x)
 
     val newChildR2 = newChildR.start(fn)
 

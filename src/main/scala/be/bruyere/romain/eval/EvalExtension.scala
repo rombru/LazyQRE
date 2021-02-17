@@ -1,8 +1,8 @@
 package be.bruyere.romain.eval
 
 object EvalExtension {
-  implicit class StartEval[In, Out, Fn <: () => Out](eval: Eval[In, Out, Fn]) {
-    def next(item: In): Eval[In, Out, Fn] = eval.next(item)
+  implicit class StartEval[In, Out](eval: Eval[In, Out, () => Out]) {
+    def next(item: In): StartEval[In, Out] = eval.next(item)
 
     def result(): Option[Out] = eval.output map (o => o())
 

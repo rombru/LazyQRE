@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 object QREUtils {
 
   @tailrec
-  def executeOnList[D, C](list: List[D], sc: StartEval[D, C, () => C], fn: (StartEval[D, C, () => C]) => Unit): Unit = {
+  def executeOnList[D, C](list: List[D], sc: StartEval[D, C], fn: (StartEval[D, C]) => Unit): Unit = {
     list match {
       case Nil => ()
       case head :: tail =>

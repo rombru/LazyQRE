@@ -4,8 +4,6 @@ import be.bruyere.romain.QREUtils.executeOnList
 import be.bruyere.romain.eval.EvalExtension.StartEval
 import be.bruyere.romain.qre.{AtomQRE, CombineQRE, IterQRE, StreamingCompositionQRE}
 
-import scala.annotation.tailrec
-
 object Main {
 
 
@@ -22,17 +20,20 @@ object Main {
     //    val iter2 = IterQRE[String, String, String, String](split2, "10", (x, y) => x.concat(y) , x => x)
     //    val apply = ApplyQRE[String, String, String](iter2, x => x.concat("apply"))
 
-    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
-    val iter1 = IterQRE[String, Int, Int, Int](atom1, 0, (x,y) => x + y, x => x)
-    val atom2 = AtomQRE[Int, Int](x => x + 5, x => true)
-    val atom3 = AtomQRE[Int, Int](x => x + 10, _ => true)
-    val combine = CombineQRE[Int,Int,Int,Int](atom2, atom3, (x,y) => x * y)
-    val iter2 = IterQRE[Int, Int, Int, Int](combine, 0, (x,y) => x + y, x => x)
-    val streamcomp = StreamingCompositionQRE[String, Int, Int](iter1, iter2)
+//    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
+//    val iter1 = IterQRE[String, Int, Int, Int](atom1, 0, (x,y) => x + y, x => x)
+//    val atom2 = AtomQRE[Int, Int](x => x + 5, _ => true)
+//    val atom3 = AtomQRE[Int, Int](x => x + 10, _ => true)
+//    val combine = CombineQRE[Int,Int,Int,Int](atom2, atom3, (x,y) => x * y)
+//    val iter2 = IterQRE[Int, Int, Int, Int](combine, 0, (x,y) => x + y, x => x)
+//    val streamcomp = StreamingCompositionQRE[String, Int, Int](iter1, iter2)
 
-    val eval = streamcomp.start()
-    val list = List("aaaaaa", "aaaaa");
-    executeOnList[String, Int](list, eval, (sc: StartEval[String, Int, () => Int]) => {
+    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
+    val iter1 = IterQRE[String, Int, Int, Int](atom1, 0, (x,y) => x + y, 20, x => x)
+
+    val eval = iter1.start()
+    val list = List("aaaaaa", "aaaaa", "sss")
+    executeOnList[String, Int](list, eval, (sc: StartEval[String, Int]) => {
       println("Result = " + sc.result())
       println("ResultFn = " + sc.resultFn())
     })
