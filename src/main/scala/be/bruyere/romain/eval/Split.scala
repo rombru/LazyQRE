@@ -1,12 +1,12 @@
 package be.bruyere.romain.eval
 
 case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
-(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], transformF: () => ((ChildLOut, ChildROut) => Agg), outputF: () => Agg => Out, output: Option[Fn])
+(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], transformF: () => (ChildLOut, ChildROut) => Agg, outputF: () => Agg => Out, output: Option[Fn])
   extends Eval[In, Out, Fn] {
 
   def start(fn: (() => Out) => Fn): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
-    val oF = outputF();
-    val tF = transformF();
+    val oF = outputF()
+    val tF = transformF()
 
     val newFn = (x: () => ChildLOut) => (y: () => ChildROut) => fn(() => oF(tF.curried(x())(y())))
 

@@ -1,6 +1,11 @@
 package be.bruyere.romain.eval
 
-case class Combine[In, Child1Out, Child2Out, Out, Fn] private(child1: Eval[In, Child1Out, (() => Child2Out) => Fn], child2: Eval[In, Child2Out, () => Child2Out], transformF: (Child1Out, Child2Out) => Out, output: Option[Fn]) extends Eval[In, Out, Fn] {
+case class Combine[In, Child1Out, Child2Out, Out, Fn] private(
+                                                               child1: Eval[In, Child1Out, (() => Child2Out) => Fn],
+                                                               child2: Eval[In, Child2Out, () => Child2Out],
+                                                               transformF: (Child1Out, Child2Out) => Out,
+                                                               output: Option[Fn]
+                                                             ) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
     val newChild1 = child1.next(item)
     val newChild2 = child2.next(item)

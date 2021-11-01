@@ -1,0 +1,10 @@
+package be.bruyere.romain.qre
+
+import be.bruyere.romain.eval.{Combine4, Eval}
+
+case class Combine4QRE[In, Child1Out, Child2Out, Child3Out, Child4Out, Out](child1: QRE[In, Child1Out], child2: QRE[In, Child2Out], child3: QRE[In, Child3Out], child4: QRE[In, Child4Out], transformF: (Child1Out,Child2Out,Child3Out,Child4Out) => Out) extends QRE[In, Out] {
+
+  protected[qre] override def create[Fn](): Eval[In, Out, Fn] = {
+    Combine4[In, Child1Out, Child2Out, Child3Out, Child4Out, Out, Fn](child1.create(), child2.create(), child3.create(), child4.create(), transformF, None)
+  }
+}

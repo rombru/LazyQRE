@@ -1,4 +1,4 @@
-name := "test-scala"
+name := "LazyQRE"
 
 version := "0.1"
 
