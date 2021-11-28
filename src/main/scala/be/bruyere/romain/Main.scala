@@ -46,7 +46,11 @@ object Main {
 //    val density = CombineQRE[String, Int, Int, Double](window1Hour, iter15Min, (x,y) => x.toDouble / (4 * y.toDouble))
 
 
+//    val t = Test;
+//    t.run
+
     this.peakHourFactor();
+//    this.sum();
 
 //    val iter1 = TumblingWindowQRE[Int, Int, Int, Int](atom1, 0, (x, y) => x + y, x => x, 3)
 
@@ -78,6 +82,19 @@ object Main {
 
     val eval = peakCoefficientForLast15Min.start()
     executeOnList[String, Double](list, eval, (sc: StartEval[String, Double]) => {
+      println("Result = " + sc.result())
+      println("ResultFn = " + sc.resultFn())
+    })
+  }
+
+  def sum(): Unit = {
+    val list = List("C", "C", "C", "C")
+
+    val isVehicleToken = AtomQRE[String, Int](x => x == "C",x => 1)
+    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, 1000, x => x)
+
+    val eval = sumOfVehicle.start()
+    executeOnList[String, Int](list, eval, (sc: StartEval[String, Int]) => {
       println("Result = " + sc.result())
       println("ResultFn = " + sc.resultFn())
     })

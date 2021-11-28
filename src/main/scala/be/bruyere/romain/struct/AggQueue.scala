@@ -17,20 +17,8 @@ case class AggQueue[A,B](queue: Queue[() => A] = Queue[() => A]()) {
   }
 
   def aggregate(init: B, trans: (B, A) => B): () => B = {
-    var fn = (y: A) => trans.curried(init)(y)
-
-    return aggregateRec(() => fn, trans, queue)
-
-
-//    for(i <- 0 until queue.length-1) {
-//      val elem = queue(i)
-//      fn = (y: A) => {
-//        val a = fn(elem())
-//        trans.curried(a)(y)
-//      }
-//    }
-//    val a = fn(queue.last())
-//    () => fn(queue.last())
+    val fn = (y: A) => trans.curried(init)(y)
+    aggregateRec(() => fn, trans, queue)
   }
 
   def aggregateRec(transCurr: () => A => B, trans: (B, A) => B, queue: Queue[() => A]): () => B = {

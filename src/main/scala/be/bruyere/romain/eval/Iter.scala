@@ -1,6 +1,8 @@
 package be.bruyere.romain.eval
 
-case class Iter[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, (() => Agg, (() => Agg) => Fn, Long)], init: Agg, transformF: (Agg, ChildOut) => Agg, iterLimit: Long, outputF: Agg => Out, output: Option[Fn]) extends Eval[In, Out, Fn] {
+import be.bruyere.romain.qre.IterQRE
+
+case class Iter[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, (() => Agg, (() => Agg) => Fn, Long)], qre: IterQRE[In, ChildOut, Agg, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
 
     val newChild = child.next(item)
@@ -9,30 +11,19 @@ case class Iter[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, ((
         max match {
           case 0 =>
             val t = trans()
-            val newFn = (x: () => ChildOut) => {
-              val newTrans = () => transformF.curried(t)(x())
-              (newTrans, out, iterLimit)
-            }
-            Iter(newChild.start(newFn), init, transformF, iterLimit, outputF, Some(out(() => t)))
+            val newFn = qre.createNewF(t, out, qre.iterLimit)
+            Iter(newChild.start(newFn), qre, Some(out(() => t)))
           case _ =>
-            val newFn = (x: () => ChildOut) => {
-              val newTrans = () => transformF.curried(trans())(x())
-              (newTrans, out, max-1)
-            }
-            Iter(newChild.start(newFn), init, transformF, iterLimit, outputF, Some(out(trans)))
+            val newFn = qre.createNewF(trans, out, max-1)
+            Iter(newChild.start(newFn), qre, Some(out(trans)))
         }
-      case None => Iter(newChild, init, transformF, iterLimit, outputF, None)
+      case None => Iter(newChild, qre, None)
     }
   }
 
   override def start(fn: (() => Out) => Fn): Eval[In, Out, Fn] = {
-    val newFn = (x: () => ChildOut) => {
-      val trans = () => transformF.curried(init)(x())
-      val out = (y: () => Agg) => fn(() => outputF(y()))
-
-      (trans, out, iterLimit)
-    }
-
-    Iter(child.start(newFn), init, transformF, iterLimit, outputF, Some(fn(() => outputF(init))))
+    val out = qre.createOutF(fn)
+    val newFn = qre.createNewF(qre.init, out, qre.iterLimit)
+    Iter(child.start(newFn), qre, Some(fn(() => qre.outputF(qre.init))))
   }
 }

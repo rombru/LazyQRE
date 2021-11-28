@@ -1,32 +1,29 @@
 package be.bruyere.romain.eval
 
+import be.bruyere.romain.qre.TumblingWindowQRE
 import be.bruyere.romain.struct.AggQueue
 
-case class TumblingWindow[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], init: Agg, transformF: (Agg, ChildOut) => Agg, outputF: Agg => Out, output: Option[Fn], winSize: Int) extends Eval[In, Out, Fn] {
+case class TumblingWindow[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], qre: TumblingWindowQRE[In, ChildOut, Agg, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
 
     val newChild = child.next(item)
     newChild.output match {
       case Some((out,queue)) =>
-        if(queue.size == winSize) {
-          val result = queue.aggregate(init, transformF)
-          val newFn = (x: () => ChildOut) => (out,new AggQueue[ChildOut, Agg](x))
-          TumblingWindow(newChild.start(newFn), init, transformF, outputF, Some(out(() => result())), winSize)
+        if(queue.size == qre.winSize) {
+          val result = queue.aggregate(qre.init, qre.transformF)
+          val newFn = qre.createNewF(out, new AggQueue[ChildOut, Agg]())
+          TumblingWindow(newChild.start(newFn), qre, Some(out(() => result())))
         } else {
-          val newFn = (x: () => ChildOut) => (out,queue.enqueue(x))
-          TumblingWindow(newChild.start(newFn), init, transformF, outputF, None, winSize)
+          val newFn = qre.createNewF(out, queue)
+          TumblingWindow(newChild.start(newFn), qre, None)
         }
-      case None => TumblingWindow(newChild, init, transformF, outputF, None, winSize)
+      case None => TumblingWindow(newChild, qre, None)
     }
   }
 
   override def start(fn: (() => Out) => Fn): Eval[In, Out, Fn] = {
-    val newFn = (x: () => ChildOut) => {
-      val out = (y: () => Agg) => fn(() => outputF(y()))
-      val queue = new AggQueue[ChildOut, Agg](x)
-      (out,queue)
-    }
-
-    TumblingWindow(child.start(newFn), init, transformF, outputF, None, winSize)
+    val out = qre.createOutF(fn)
+    val newFn = qre.createNewF(out, new AggQueue[ChildOut, Agg]())
+    TumblingWindow(child.start(newFn), qre, None)
   }
 }

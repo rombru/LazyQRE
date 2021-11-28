@@ -1,15 +1,16 @@
 package be.bruyere.romain.eval
 
-case class Apply[In, ChildOut, Out, Fn] private(child: Eval[In, ChildOut, Fn], outputF: ChildOut => Out, output: Option[Fn]) extends Eval[In, Out, Fn] {
+import be.bruyere.romain.qre.ApplyQRE
+
+case class Apply[In, ChildOut, Out, Fn] private(child: Eval[In, ChildOut, Fn], qre: ApplyQRE[In, ChildOut, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
     val newChild = child.next(item)
-    Apply(newChild, outputF, newChild.output)
+    Apply(newChild, qre, newChild.output)
   }
 
   override def start(fn: (() => Out) => Fn): Eval[In, Out, Fn] = {
-    def newFn(x: () => ChildOut) = fn(() => outputF(x()))
-
+    val newFn = qre.createNewF(fn)
     val newChild = child.start(newFn)
-    Apply(newChild, outputF, newChild.output)
+    Apply(newChild, qre, newChild.output)
   }
 }

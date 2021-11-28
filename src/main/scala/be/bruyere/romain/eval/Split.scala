@@ -1,27 +1,26 @@
 package be.bruyere.romain.eval
 
+import be.bruyere.romain.qre.SplitQRE
+
 case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
-(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], transformF: () => (ChildLOut, ChildROut) => Agg, outputF: () => Agg => Out, output: Option[Fn])
+(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], qre: SplitQRE[In, ChildLOut, ChildROut, Agg, Out], output: Option[Fn])
   extends Eval[In, Out, Fn] {
 
   def start(fn: (() => Out) => Fn): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
-    val oF = outputF()
-    val tF = transformF()
-
-    val newFn = (x: () => ChildLOut) => (y: () => ChildROut) => fn(() => oF(tF.curried(x())(y())))
+    val newFn = qre.createNewF(fn)
 
     val newChildL = childL.start(newFn)
     newChildL.output match {
       case Some(childOutput) =>
-        val fn = (x: () => ChildROut) => childOutput(x)
+        val fn = qre.createOutputLeftF(childOutput)
 
         val newChildR = childR.start(fn)
 
         newChildR.output match {
-          case Some(_) => Split[In, ChildLOut, ChildROut, Agg, Out, Fn](newChildL, newChildR, transformF, outputF, newChildR.output)
-          case None => Split(newChildL, newChildR, transformF, outputF, None)
+          case Some(_) => Split[In, ChildLOut, ChildROut, Agg, Out, Fn](newChildL, newChildR, qre, newChildR.output)
+          case None => Split(newChildL, newChildR, qre, None)
         }
-      case None => Split(newChildL, childR, transformF, outputF, None)
+      case None => Split(newChildL, childR, qre, None)
     }
   }
 
@@ -33,12 +32,12 @@ case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
       case Some(childOutput) => restartRight(childOutput, newChildR)
       case None => (newChildR, newChildR.output)
     }
-    Split(newChildL, newChildR2, transformF, outputF, output)
+    Split(newChildL, newChildR2, qre, output)
 
   }
 
   private def restartRight(outputL: (() => ChildROut) => Fn, newChildR: Eval[In, ChildROut, Fn]) = {
-    val fn = (x: () => ChildROut) => outputL(x)
+    val fn = qre.createOutputLeftF(outputL)
 
     val newChildR2 = newChildR.start(fn)
 
