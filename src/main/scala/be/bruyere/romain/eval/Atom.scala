@@ -1,19 +1,20 @@
 package be.bruyere.romain.eval
 
-case class Atom[In, Out, Fn] private(predicate: In => Boolean, outputF: () => In => Out, current: Option[In => Fn], output: Option[Fn])
+import be.bruyere.romain.qre.AtomQRE
+
+case class Atom[In, Out, Fn] private(predicate: In => Boolean, qre: AtomQRE[In, Out], current: Option[In => Fn], output: Option[Fn])
   extends Eval[In, Out, Fn] {
 
   def start(fn: (() => Out) => Fn): Atom[In, Out, Fn] = {
-    val oF = outputF()
-
-    Atom( predicate, outputF, Some((x: In) => fn(() => oF(x))), None)
+    val newFn = qre.createNewF(fn)
+    Atom( predicate, qre, Some(newFn), None)
   }
 
   def next(item: In): Atom[In, Out, Fn] = {
     if (predicate(item) && current.isDefined) {
-      Atom(predicate, outputF, None, current map (c => c(item)))
+      Atom(predicate, qre, None, current map (c => c(item)))
     } else {
-      Atom( predicate, outputF, None, None)
+      Atom( predicate, qre, None, None)
     }
   }
 }
