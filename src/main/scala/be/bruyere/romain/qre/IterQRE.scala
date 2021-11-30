@@ -2,7 +2,9 @@ package be.bruyere.romain.qre
 
 import be.bruyere.romain.eval.{Eval, Iter}
 
-case class IterQRE[In, ChildOut, Agg, Out] (child: QRE[In, ChildOut], init: Agg, transformF: (Agg, ChildOut) => Agg, iterLimit: Long, outputF: Agg => Out) extends QRE[In, Out] {
+case class IterQRE[In, ChildOut, Agg, Out] (child: QRE[In, ChildOut], init: Agg, transformF: (Agg, ChildOut) => Agg, outputF: Agg => Out, iterLimit: Long) extends QRE[In, Out] {
+
+  def this(child: QRE[In, ChildOut], init: Agg, transformF: (Agg, ChildOut) => Agg, outputF: Agg => Out) = this(child, init, transformF, outputF, 1)
 
   protected[qre] override def create[Fn](): Eval[In, Out, Fn] = {
     Iter[In, ChildOut, Agg, Out, Fn](child.create(), this, None)
