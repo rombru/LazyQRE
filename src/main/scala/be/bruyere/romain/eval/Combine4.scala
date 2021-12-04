@@ -2,12 +2,12 @@ package be.bruyere.romain.eval
 
 import be.bruyere.romain.qre.Combine4QRE
 
-case class Combine4[In, Child1Out, Child2Out, Child3Out, Child4Out, Out, Fn] private(
+case class Combine4[In, Out, Child1Out, Child2Out, Child3Out, Child4Out, Fn] private(
                                                                 child1: Eval[In, Child1Out, (() => Child2Out, () => Child3Out, () => Child4Out) => Fn],
                                                                 child2: Eval[In, Child2Out, () => Child2Out],
                                                                 child3: Eval[In, Child3Out, () => Child3Out],
                                                                 child4: Eval[In, Child4Out, () => Child4Out],
-                                                                qre: Combine4QRE[In, Child1Out, Child2Out, Child3Out, Child4Out, Out],
+                                                                qre: Combine4QRE[In, Out, Child1Out, Child2Out, Child3Out, Child4Out],
                                                                 output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
     val newChild1 = child1.next(item)

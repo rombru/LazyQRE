@@ -2,11 +2,11 @@ package be.bruyere.romain.eval
 
 import be.bruyere.romain.qre.SplitQRE
 
-case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
-(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], qre: SplitQRE[In, ChildLOut, ChildROut, Agg, Out], output: Option[Fn])
+case class Split[In, Out, ChildLOut, ChildROut, Agg, Fn] private
+(childL: Eval[In, ChildLOut, (() => ChildROut) => Fn], childR: Eval[In, ChildROut, Fn], qre: SplitQRE[In, Out, ChildLOut, ChildROut, Agg], output: Option[Fn])
   extends Eval[In, Out, Fn] {
 
-  def start(fn: (() => Out) => Fn): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
+  def start(fn: (() => Out) => Fn): Split[In, Out, ChildLOut, ChildROut, Agg, Fn] = {
     val newFn = qre.createNewF(fn)
 
     val newChildL = childL.start(newFn)
@@ -17,14 +17,14 @@ case class Split[In, ChildLOut, ChildROut, Agg, Out, Fn] private
         val newChildR = childR.start(fn)
 
         newChildR.output match {
-          case Some(_) => Split[In, ChildLOut, ChildROut, Agg, Out, Fn](newChildL, newChildR, qre, newChildR.output)
+          case Some(_) => Split[In, Out, ChildLOut, ChildROut, Agg, Fn](newChildL, newChildR, qre, newChildR.output)
           case None => Split(newChildL, newChildR, qre, None)
         }
       case None => Split(newChildL, childR, qre, None)
     }
   }
 
-  def next(item: In): Split[In, ChildLOut, ChildROut, Agg, Out, Fn] = {
+  def next(item: In): Split[In, Out, ChildLOut, ChildROut, Agg, Fn] = {
     val newChildL = childL.next(item)
     val newChildR = childR.next(item)
 

@@ -3,7 +3,7 @@ package be.bruyere.romain.eval
 import be.bruyere.romain.qre.TumblingWindowQRE
 import be.bruyere.romain.struct.AggQueue
 
-case class TumblingWindow[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], qre: TumblingWindowQRE[In, ChildOut, Agg, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
+case class TumblingWindow[In, Out, ChildOut, Agg, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], qre: TumblingWindowQRE[In, Out, ChildOut, Agg], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
 
     val newChild = child.next(item)

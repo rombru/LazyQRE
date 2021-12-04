@@ -2,10 +2,10 @@ package be.bruyere.romain.eval
 
 import be.bruyere.romain.qre.CombineQRE
 
-case class Combine[In, Child1Out, Child2Out, Out, Fn] private(
+case class Combine[In, Out, Child1Out, Child2Out, Fn] private(
                                                                child1: Eval[In, Child1Out, (() => Child2Out) => Fn],
                                                                child2: Eval[In, Child2Out, () => Child2Out],
-                                                               qre: CombineQRE[In, Child1Out, Child2Out, Out],
+                                                               qre: CombineQRE[In, Out, Child1Out, Child2Out],
                                                                output: Option[Fn]
                                                              ) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {

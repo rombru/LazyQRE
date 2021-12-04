@@ -11,6 +11,86 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
+//    val filterCars = (x:String) => x == "C"
+//    val mapToOne = (x:String) => 1
+//
+//    val vehicles = List("C","M,","T","C","T")
+//    val count = vehicles
+//      .filter(filterCars)
+//      .map(mapToOne)
+//      .sum
+
+
+//    val addition5 = (x:Int) => x + 5
+//    val multiplyBy10 = (fn : Int => Int, x: Int) => fn(x * 10)
+//    val result = multiplyBy10(addition5, 3)
+
+//    val addition5 = (x:Int) => x + 5
+//    val multiplyBy10 = (x: Int) => x * 10
+//    val result = (addition5 compose multiplyBy10)(3)
+
+//    val addition1 = (x:Int,y:Int) => x + y
+//    val result1 = addition1(2,3)
+//
+//    val addition2 = (x:Int) => (y:Int) => x + y
+//    val result2 = addition2(2)(3)
+//
+//    val addition3 = (x:Int) => (y:Int) => x + y
+//    val partialAddition = addition3(2)
+//    val result3 = partialAddition(3)
+//
+//    val addition4 = addition1.curried
+//    val result4 = addition4(2)(3)
+
+
+//    val number:Option[Double] = Some(2)
+//    val none:Option[Double] = None
+//
+//    def divide(x:Double, y:Double) = if (y == 0) None else Some(x/y)
+//
+//    val div1 = divide(4,2) // Some(2)
+//    val div2 = divide(4,0) // None
+//
+//    val mult1 = div1.map(x => x * 3) // Some(6)
+//    val mult2 = div2.map(x => x * 3) // None
+
+
+
+//    val notFlattened:Option[Option[Double]] = mult1.map(x => if (x > 10) Some(x) else None) // Some(None)
+//    val flattened:Option[Double] = mult1.flatMap(x => if (x > 10) Some(x) else None) // None
+
+//    case class Vehicle(vehicleBrand: String, vehicleType: String)
+//
+//    val v1 = Vehicle("Mercedes", "Car")
+//    val v2 = Vehicle("Mercedes", "Car")
+//
+//    println(v1 == v2)
+
+//    abstract class Vehicle(vehicleBrand: String)
+//
+//    case class Car(brand: String) extends Vehicle(brand)
+//    case class Truck(brand: String, load:String) extends Vehicle(brand)
+//    case class Moto(brand: String) extends Vehicle(brand)
+//
+//    def printVehicle(vehicle: Vehicle): Unit = {
+//      vehicle match {
+//        case Car(brand) => println(s"This is a car from the brand $brand")
+//        case Truck(brand, _) => println(s"This is a truck from the brand $brand")
+//        case Moto(brand) => println(s"This is a moto from the brand $brand")
+//      }
+//    }
+//
+//
+//    def printOption(option: Option[Int]): Unit = {
+//      option match {
+//        case Some(value) => println(s"The contained value is $value")
+//        case None => println(s"There is no contained value")
+//      }
+//    }
+
+
+//    println(result)
+
     //    val atom1 = AtomQRE[String, Int](x => x.length, x => x.nonEmpty)
     //    val atom2 = AtomQRE[String, Int](x => x.length, x => x.length > 20)
     //    val atom2b = AtomQRE[String, Int](x => 20, x => x.length <= 20)
@@ -73,17 +153,17 @@ object Main {
     val isVehicleToken = AtomQRE[String, Int]( x => x == "C", x => 1)
     val is15MinToken = AtomQRE[String, String](x => x == "M", x => x)
 
-    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, 20, x => x)
-    val sumOfVehiclesDuring15Min = SplitQRE[String,Int,String,Int,Int](sumOfVehicle, is15MinToken, (x,y) => x, x => x)
+    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, x => x, 20)
+    val sumOfVehiclesDuring15Min = SplitQRE[String,Int, Int,String,Int](sumOfVehicle, is15MinToken, (x,y) => x, x => x)
     val sumOfVehicleDuring1Hour = WindowQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x, y) => x + y, x => x, 4)
 
-    val sumOfVehicleLast15Min = IterQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x,y) => y, 20, x => x)
-    val peakCoefficientForLast15Min = CombineQRE[String, Int, Int, Double](sumOfVehicleDuring1Hour, sumOfVehicleLast15Min, (x,y) => x.toDouble / (4 * y.toDouble))
+    val sumOfVehicleLast15Min = IterQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x,y) => y, x => x, 20)
+    val peakCoefficientForLast15Min = CombineQRE[String, Double, Int, Int](sumOfVehicleDuring1Hour, sumOfVehicleLast15Min, (x,y) => x.toDouble / (4 * y.toDouble))
 
     val eval = peakCoefficientForLast15Min.start()
     executeOnList[String, Double](list, eval, (sc: StartEval[String, Double]) => {
-      println("Result = " + sc.result())
-      println("ResultFn = " + sc.resultFn())
+//      println("Result = " + sc.result())
+//      println("ResultFn = " + sc.resultFn())
     })
   }
 
@@ -91,7 +171,7 @@ object Main {
     val list = List("C", "C", "C", "C")
 
     val isVehicleToken = AtomQRE[String, Int](x => x == "C",x => 1)
-    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, 1000, x => x)
+    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, x => x, 1000)
 
     val eval = sumOfVehicle.start()
     executeOnList[String, Int](list, eval, (sc: StartEval[String, Int]) => {
@@ -104,19 +184,19 @@ object Main {
     val isVehicleToken = AtomQRE[String, Int](x => x == "C",x => 1)
     val is15MinToken = AtomQRE[String, String](x => x == "M",x => x)
 
-    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, 1000, x => x)
-    val sumOfVehiclesDuring15Min = SplitQRE[String,Int,String,Int,Int](sumOfVehicle, is15MinToken, (x,y) => x, x => x)
+    val sumOfVehicle = IterQRE[String, Int, Int, Int](isVehicleToken, 0, (x,y) => x + y, x => x, 1000)
+    val sumOfVehiclesDuring15Min = SplitQRE[String,Int, Int,String,Int](sumOfVehicle, is15MinToken, (x,y) => x, x => x)
     val sumOfVehicleDuring1Hour = WindowQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x, y) => x + y, x => x, 4)
 
-    val sumOfVehicleLast15Min = IterQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x,y) => y, 1000, x => x)
-    val peakCoefficientForLast15Min = CombineQRE[String, Int, Int, Double](sumOfVehicleDuring1Hour, sumOfVehicleLast15Min, (x,y) => x.toDouble / (4 * y.toDouble))
+    val sumOfVehicleLast15Min = IterQRE[String, Int, Int, Int](sumOfVehiclesDuring15Min, 0, (x,y) => y, x => x, 1000)
+    val peakCoefficientForLast15Min = CombineQRE[String, Double, Int, Int](sumOfVehicleDuring1Hour, sumOfVehicleLast15Min, (x,y) => x.toDouble / (4 * y.toDouble))
 
-    var eval = peakCoefficientForLast15Min.start();
+    var eval = peakCoefficientForLast15Min.start()
 
     val list = List("C","M")
     for(i <- 0 until 10000000) {
       eval = eval.next(getRandomElement(list,new Random()))
-      checkJvm();
+      checkJvm()
       println("Result = " + eval.result())
 //      println("ResultFn = " + eval.resultFn())
     }

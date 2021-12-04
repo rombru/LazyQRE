@@ -1,6 +1,6 @@
 package be.bruyere.romain.eval
 
-case class StreamingCompose[In, Child1Out, Out, Fn] private(child1: Eval[In, Child1Out, () => Child1Out], child2: Eval[Child1Out, Out, Fn], output: Option[Fn]) extends Eval[In, Out, Fn] {
+case class StreamingCompose[In, Out, ChildOut, Fn] private(child1: Eval[In, ChildOut, () => ChildOut], child2: Eval[ChildOut, Out, Fn], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
     val newChild1 = child1.next(item)
     strcompose(newChild1, child2)
@@ -12,7 +12,7 @@ case class StreamingCompose[In, Child1Out, Out, Fn] private(child1: Eval[In, Chi
     strcompose(newChild1, newChild2)
   }
 
-  private def strcompose(child1: Eval[In, Child1Out, () => Child1Out], child2: Eval[Child1Out, Out, Fn]) = {
+  private def strcompose(child1: Eval[In, ChildOut, () => ChildOut], child2: Eval[ChildOut, Out, Fn]) = {
     child1.output match {
       case Some(out) =>
         val newChild2 = child2.next(out())

@@ -2,7 +2,7 @@ package be.bruyere.romain.eval
 
 import be.bruyere.romain.qre.IterQRE
 
-case class Iter[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, (() => Agg, (() => Agg) => Fn, Long)], qre: IterQRE[In, ChildOut, Agg, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
+case class Iter[In, Out, ChildOut, Agg, Fn] private(child: Eval[In, ChildOut, (() => Agg, (() => Agg) => Fn, Long)], qre: IterQRE[In, Out, ChildOut, Agg], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
 
     val newChild = child.next(item)

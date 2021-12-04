@@ -3,7 +3,7 @@ package be.bruyere.romain.eval
 import be.bruyere.romain.qre.WindowQRE
 import be.bruyere.romain.struct.AggQueue
 
-case class Window[In, ChildOut, Agg, Out, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], qre: WindowQRE[In, ChildOut, Agg, Out], output: Option[Fn]) extends Eval[In, Out, Fn] {
+case class Window[In, Out, ChildOut, Agg, Fn] private(child: Eval[In, ChildOut, ((() => Agg) => Fn, AggQueue[ChildOut, Agg])], qre: WindowQRE[In, Out, ChildOut, Agg], output: Option[Fn]) extends Eval[In, Out, Fn] {
   override def next(item: In): Eval[In, Out, Fn] = {
 
     val newChild = child.next(item)
